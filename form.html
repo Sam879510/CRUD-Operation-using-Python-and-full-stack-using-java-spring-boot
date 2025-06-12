@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KALS Promotional Item Request</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 20px auto; padding: 20px; }
+        select, input, button { 
+            padding: 10px; 
+            margin: 10px 0; 
+            width: 100%; 
+            font-size: 16px;
+        }
+        button { background: #0066cc; color: white; border: none; cursor: pointer; }
+        #message { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        .error { background: #ffebee; color: #c62828; }
+        .loading { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <h1>KALS Promotional Item Request</h1>
+    <form id="requestForm">
+        <div>
+            <label for="beerSelect">Select Beer:</label>
+            <select id="beerSelect" required>
+                <option value="">-- Loading beers... --</option>
+            </select>
+        </div>
+        
+        <div>
+            <label for="promoItem">Promo Item:</label>
+            <input type="text" id="promoItem" readonly>
+        </div>
+        
+        <div>
+            <label for="quantity">Quantity:</label>
+            <input type="number" id="quantity" min="1" required>
+        </div>
+        
+        <button type="submit">Submit Request</button>
+    </form>
+    
+    <div id="message" class="loading">Loading application...</div>
+
+    <script>
+        // DOM Elements
+        const beerSelect = document.getElementById('beerSelect');
+        const promoItem = document.getElementById('promoItem');
+        const messageEl = document.getElementById('message');
+        const form = document.getElementById('requestForm');
+
+        // =============================================
+        // REPLACE THE ENTIRE loadBeers FUNCTION WITH THIS:
+        // =============================================
+        async function loadBeers() {
+            try {
+                const response = await fetch('http://localhost:8080/api/beers', {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error(`Backend responded with status ${response.status}`);
+                
+                const beers = await response.json();
+                const select = document.getElementById('beerSelect');
+                
+                // Clear loading message
+                select.innerHTML = '<option value="">-- Select Beer --</option>'; 
+                
+                beers.forEach(beer => {
+                    const option = document.createElement('option');
+                    option.value = beer.id;
+                    option.textContent = beer.beerName;  // Changed from template string
+                    option.dataset.promo = beer.promoItem;
+                    option.dataset.stock = beer.quantity; // <-- Add this line
+                    select.appendChild(option);
+                });
+                
+                document.getElementById('message').textContent = '';
+            } catch (error) {
+                console.error('Failed to load beers:', error);
+                document.getElementById('message').textContent = 
+                    `Connection failed. Please:
+                    1. Verify http://localhost:8080/api/beers works
+                    2. Check browser console (F12)`;
+                document.getElementById('message').className = "error";
+            }
+        }
+        // =============================================
+        // END OF NEW loadBeers FUNCTION
+        // =============================================
+
+        // 2. Update promo item when beer is selected
+        beerSelect.addEventListener('change', function () {
+        const selectedOption = this.options[this.selectedIndex];
+        promoItem.value = selectedOption.dataset.promo || '';
+
+        const stock = parseInt(selectedOption.dataset.stock || "0");
+        const quantityInput = document.getElementById('quantity');
+        quantityInput.max = stock;
+        quantityInput.placeholder = `Max: ${stock}`;
+
+        });
+
+
+        // 3. Handle form submission
+        form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const beerId = beerSelect.value;
+        const quantity = parseInt(document.getElementById("quantity").value);
+        const stock = parseInt(beerSelect.options[beerSelect.selectedIndex].dataset.stock || "0");
+
+        if (quantity > stock) {
+            messageEl.textContent = `Only ${stock} items available`;
+            messageEl.className = "error";
+            return; // Cancel submission
+        }
+
+
+        messageEl.textContent = ""; // Clear old messages
+
+        try {
+            const response = await fetch("http://localhost:8080/api/beers/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ beerId, quantity }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Request failed");
+        }
+
+        messageEl.textContent = result.message || "Order placed!";
+        messageEl.className = "success";
+
+        loadBeers(); // Refresh inventory
+
+            } catch (error) {
+                messageEl.textContent = `Error: ${error.message}`;
+                messageEl.className = "error";
+            }
+        });
+
+
+        // Initial load
+        loadBeers();
+    </script>
+</body>
+</html>

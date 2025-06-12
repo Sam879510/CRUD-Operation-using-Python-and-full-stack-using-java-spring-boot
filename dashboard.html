@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KALS Inventory Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .low-stock { background-color: #ffdddd; }
+        .error-message { color: red; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>KALS Inventory Dashboard</h1>
+    <div id="errorMessage" class="error-message"></div>
+    <table id="inventoryTable">
+        <thead>
+            <tr>
+                <th>Beer Name</th>
+                <th>Promo Item</th>
+                <th>Quantity Available</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Will be populated by JavaScript -->
+        </tbody>
+    </table>
+
+    <script>
+        // =============================================
+        // REPLACE THE ENTIRE refreshInventory FUNCTION WITH THIS:
+        // =============================================
+        async function refreshInventory() {
+            try {
+                const response = await fetch('http://localhost:8080/api/beers');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const beers = await response.json();
+                const tbody = document.querySelector('#inventoryTable tbody');
+                tbody.innerHTML = '';
+                
+                beers.forEach(beer => {
+                    const row = document.createElement('tr');
+                    if (beer.quantity < 1) row.classList.add('low-stock');
+                    
+                    row.innerHTML = `
+                        <td>${beer.beerName}</td>
+                        <td>${beer.promoItem}</td>
+                        <td>${beer.quantity}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                document.getElementById('errorMessage').textContent = '';
+            } catch (error) {
+                console.error('Inventory refresh failed:', error);
+                document.getElementById('errorMessage').textContent = 
+                    `Failed to load: ${error.message}. Verify:
+                    1. Backend is running
+                    2. No CORS errors in console`;
+            }
+        }
+        // =============================================
+        // END OF NEW refreshInventory FUNCTION
+        // =============================================
+        
+        // Initial load
+        refreshInventory();
+        
+        // Refresh every 30 seconds
+        setInterval(refreshInventory, 30000);
+    </script>
+</body>
+</html>
